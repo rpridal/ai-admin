@@ -1,0 +1,4 @@
+openai_api_key: ""
+trust_level: "medium"  # options: low, medium, high
+language: "Czech"
+data_dir: "./data"
