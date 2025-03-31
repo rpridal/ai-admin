@@ -5,7 +5,7 @@ from rich import print as rprint
 from rich.panel import Panel
 from rich.console import Console
 import sys, yaml, time
-from ai import query_ai
+from ai import ai_provider
 from memory import (
     load_config,
     save_session_interaction,
@@ -60,19 +60,22 @@ def main():
             for msg in history
         ]
 
-        ai_response = query_ai(messages)
+        ai_response = ai_provider.query(messages, mode="fast")
         save_session_interaction(session_id, "assistant", ai_response)
 
         try:
             action = yaml.safe_load(ai_response)
         except yaml.YAMLError as e:
             rprint(f"[red]❌ Chyba při parsování YAML:[/red] {e}")
-            continue
+            rprint("\n[red]Odpověď AI:[/red]")
+            rprint(ai_response)
+            sys.exit(1)
 
         if not isinstance(action, dict) or "action" not in action:
             rprint("[red]❌ AI odpověď neobsahuje platnou akci.[/red]")
-            rprint(action)
-            continue
+            rprint("\n[red]Odpověď AI:[/red]")
+            rprint(ai_response)
+            sys.exit(1)
 
         if "remember" in action:
             save_to_knowledge_base(action["remember"])
@@ -85,7 +88,7 @@ def main():
             handler_class(action, session_id).execute()
         else:
             rprint(f"[red]⚠️ Neznámá akce: {action_type}[/red]")
-            break
+            sys.exit(1)
 
 if __name__ == "__main__":
     main()
