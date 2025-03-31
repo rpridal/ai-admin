@@ -34,14 +34,13 @@ def save_to_knowledge_base(info):
         kb['memory'].append(info)
     save_yaml(kb, KB_FILE)
 
-def save_audit_log(command, approved, edited, session_id, ai_generated, result):
+def save_audit_log(command, edited, session_id, ai_generated, result):
     log = load_yaml(AUDIT_LOG_FILE)
     if "audit" not in log:
         log["audit"] = []
     log["audit"].append({
         "timestamp": datetime.now().isoformat(),
         "command": command,
-        "approved_by_user": approved,
         "edited_by_user": edited,
         "session_id": session_id,
         "ai_generated": ai_generated,
