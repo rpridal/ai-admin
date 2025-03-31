@@ -28,7 +28,9 @@ system_instruction: |
     full_output_required: true
 
   Use this field only if the command's output needs to be fully available in order to complete the task (e.g., parsing, filtering, summarizing).
-
+  
+  If there is no recent user instruction or the continuation is unclear, respond with a question asking what to do next.
+  
   ---
   Response format:
   
