@@ -1,20 +1,32 @@
 import yaml, os
 from datetime import datetime
+from pathlib import Path
 
-config = yaml.safe_load(open("config.yaml"))
+CONFIG_DIR = Path.home() / ".aia"
+CONFIG_FILE = CONFIG_DIR / "config.yaml"
+DEFAULT_CONFIG = {
+    "language": "cz",
+    "trust_level": "ask",
+}
 
-DATA_DIR = config.get("data_dir", "./data")
-KB_FILE = os.path.join(DATA_DIR, "knowledge_base.yaml")
-AUDIT_LOG_FILE = os.path.join(DATA_DIR, "audit_log.yaml")
-SESSIONS_DIR = os.path.join(DATA_DIR, "sessions")
+DATA_DIR = CONFIG_DIR
+KB_FILE = DATA_DIR / "knowledge_base.yaml"
+AUDIT_LOG_FILE = DATA_DIR / "audit_log.yaml"
+SESSIONS_DIR = DATA_DIR / "sessions"
+
+def load_config():
+    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    if not CONFIG_FILE.exists():
+        with CONFIG_FILE.open("w") as f:
+            yaml.dump(DEFAULT_CONFIG, f)
+    with CONFIG_FILE.open("r") as f:
+        return yaml.safe_load(f) or DEFAULT_CONFIG
 
 def ensure_dirs_and_files():
-    os.makedirs(SESSIONS_DIR, exist_ok=True)
-
+    SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
     for file in [KB_FILE, AUDIT_LOG_FILE]:
-        if not os.path.exists(file):
-            with open(file, 'w') as f:
-                f.write("# Automatically created by aia\n")
+        if not file.exists():
+            file.write_text("# Automatically created by aia\n")
 
 def load_yaml(file_path):
     if os.path.exists(file_path):
@@ -49,7 +61,7 @@ def save_audit_log(command, edited, session_id, ai_generated, result):
     save_yaml(log, AUDIT_LOG_FILE)
 
 def save_session_interaction(session_id, role, content):
-    session_file = os.path.join(SESSIONS_DIR, f"{session_id}.yaml")
+    session_file = SESSIONS_DIR / f"{session_id}.yaml"
     session = load_yaml(session_file)
     if "interactions" not in session:
         session["interactions"] = []
@@ -57,7 +69,7 @@ def save_session_interaction(session_id, role, content):
     save_yaml(session, session_file)
 
 def load_session_history(session_id):
-    session_file = os.path.join(SESSIONS_DIR, f"{session_id}.yaml")
+    session_file = SESSIONS_DIR / f"{session_id}.yaml"
     return load_yaml(session_file).get("interactions", [])
 
 def check_and_remember_unavailable_tools(ai, shell_output):
@@ -69,3 +81,17 @@ def check_and_remember_unavailable_tools(ai, shell_output):
 
     if parsed_response.get("remember"):
         save_to_knowledge_base(parsed_response["info"])
+
+def get_paths():
+    return {
+        "kb_file": str(KB_FILE),
+        "audit_log": str(AUDIT_LOG_FILE),
+        "sessions_dir": str(SESSIONS_DIR)
+    }
+
+def get_latest_session_id():
+    files = [f for f in os.listdir(get_paths().get("sessions_dir")) if f.endswith(".yaml")]
+    if not files:
+        return None
+    latest = max(files, key=lambda f: int(f.replace(".yaml", "")))
+    return latest.replace(".yaml", "")

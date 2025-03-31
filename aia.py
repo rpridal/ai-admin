@@ -1,15 +1,20 @@
+#!/usr/bin/env python3
+
 import questionary
 from rich import print as rprint
 from rich.panel import Panel
 from rich.console import Console
-import sys, yaml, time, os
+import sys, yaml, time
 from ai import query_ai
 from memory import (
+    load_config,
     save_session_interaction,
     load_session_history,
     save_audit_log,
     ensure_dirs_and_files,
-    save_to_knowledge_base
+    save_to_knowledge_base,
+    get_paths,
+    get_latest_session_id
 )
 from commands.run_shell import RunShellCommand
 from commands.ask_user import AskUserCommand
@@ -17,23 +22,15 @@ from commands.done import DoneCommand
 
 console = Console()
 
-config = yaml.safe_load(open("config.yaml"))
-language = config["language"]
-trust_level = config["trust_level"]
+config = load_config()
+language = config.get("language", "cz")
+trust_level = config.get("trust_level", "ask")
 
 handlers = {
     "run_shell": RunShellCommand,
     "ask_user": AskUserCommand,
     "done": DoneCommand
 }
-
-def get_latest_session_id():
-    session_dir = "data/sessions"
-    files = [f for f in os.listdir(session_dir) if f.endswith(".yaml")]
-    if not files:
-        return None
-    latest = max(files, key=lambda f: int(f.replace(".yaml", "")))
-    return latest.replace(".yaml", "")
 
 def main():
     ensure_dirs_and_files()
@@ -52,7 +49,7 @@ def main():
         save_session_interaction(session_id, "user", "Pokračuj, kde jsme skončili. Co mám udělat dál?")
     else:
         session_id = str(int(time.time()))
-        user_prompt = args[0]
+        user_prompt = " ".join(args)
         save_session_interaction(session_id, "user", user_prompt)
 
     while True:
