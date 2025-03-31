@@ -28,7 +28,10 @@ def save_yaml(data, file_path):
 
 def save_to_knowledge_base(info):
     kb = load_yaml(KB_FILE)
-    kb.update(info)
+    if 'memory' not in kb:
+        kb['memory'] = []
+    if info not in kb['memory']:
+        kb['memory'].append(info)
     save_yaml(kb, KB_FILE)
 
 def save_audit_log(command, approved, edited, session_id, ai_generated, result):
@@ -57,3 +60,13 @@ def save_session_interaction(session_id, role, content):
 def load_session_history(session_id):
     session_file = os.path.join(SESSIONS_DIR, f"{session_id}.yaml")
     return load_yaml(session_file).get("interactions", [])
+
+def check_and_remember_unavailable_tools(ai, shell_output):
+    prompts = yaml.safe_load(open("prompts.yaml"))
+    prompt = prompts["remember_instruction"].format(shell_output=shell_output)
+
+    response = ai([{"role": "system", "content": prompt}])
+    parsed_response = yaml.safe_load(response)
+
+    if parsed_response.get("remember"):
+        save_to_knowledge_base(parsed_response["info"])
