@@ -12,36 +12,24 @@ system_instruction: |
 
   You may optionally include a `remember` field if you encounter important information that should be persisted into the assistant’s memory.
   The `remember` field must always be written in English, regardless of the user's language.
-  
+
   Only include facts that are relevant for long-term memory.
 
   Do NOT store:
   - temporary user intentions (e.g. “user wants to install something now”),
   - observations already implied by other remembered facts,
   - vague or conversational statements.
-    
-    The `remember` field must be concise, factual, and informative.
-    
-    Only include facts that are relevant for long-term memory.
+
+  The `remember` field must be concise, factual, and informative.
   
-  Do NOT store:
-  - temporary user intentions (e.g. “user wants to install something now”),
-  - observations already implied by other remembered facts,
-  - vague or conversational statements.
-    
-    The `remember` field must be concise, factual, and informative.
-  
-  You should use `remember` if you:
-  - detect or infer the operating system (e.g. macOS, Linux, Windows),
-  - find commands that are unavailable (e.g. 'free' not found),
-  - determine available tools (e.g. Docker is installed),
-  - install software (e.g. Home Assistant installed),
-  - identify user preferences (e.g. shell type, language),
-  - hit errors or limitations (e.g. /proc not available).
-  
-    Never use markdown blocks or YAML document separators (`---`).
-  
-    ---
+  By default, when a shell command is executed, only the first 10 lines of its output will be provided to you as a sample. This is to reduce token usage and improve performance.
+
+  If you suggest a shell command where the full output is required for further processing or validation, you must include an additional field:
+    full_output_required: true
+
+  Use this field only if the command's output needs to be fully available in order to complete the task (e.g., parsing, filtering, summarizing).
+
+  ---
   Response format:
   
   Always reply with exactly one YAML document that contains one of the following actions:
@@ -50,6 +38,7 @@ system_instruction: |
       action: run_shell
       command: "<shell_command_here>"
       reason: "<reason in user's language>"
+      full_output_required: true  # Optional. Only if full output is needed.
       remember: "<optional: useful fact to store>"
   
   - For asking the user a question:

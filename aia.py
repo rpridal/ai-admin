@@ -14,7 +14,6 @@ from memory import (
     KB_FILE
 )
 
-
 console = Console()
 
 config = yaml.safe_load(open("config.yaml"))
@@ -23,15 +22,15 @@ trust_level = config["trust_level"]
 
 MAX_OUTPUT_LINES = 10
 
-def get_head_of_output(text, lines=MAX_OUTPUT_LINES):
-    all_lines = text.strip().splitlines()
-    return "\n".join(all_lines[:lines]) + ("\n... [truncated]" if len(all_lines) > lines else "")
-
 def run_shell_command(command):
     rprint("[bold green]🚀 Spouštím příkaz...[/bold green]\n")
     result = subprocess.getoutput(command)
     console.print(Panel(result, title="✅ [green]Výstup příkazu[/green]", style="cyan"))
     return result
+
+def get_head_output(text, lines=MAX_OUTPUT_LINES):
+    all_lines = text.strip().splitlines()
+    return "\n".join(all_lines[:lines]) + ("\n... [truncated]" if len(all_lines) > lines else "")
 
 def main():
     ensure_dirs_and_files()
@@ -40,7 +39,7 @@ def main():
         rprint('[red]Použití:[/red] aia "[yellow]tvůj prompt[/yellow]"')
         sys.exit(1)
 
-    session_id = str(int(time.time()))  # Unix timestamp jako ID session
+    session_id = str(int(time.time()))
     user_prompt = sys.argv[1]
     save_session_interaction(session_id, "user", user_prompt)
 
@@ -68,9 +67,13 @@ def main():
         if action["action"] == "run_shell":
             command = action["command"]
             reason = action.get("reason", "Bez uvedení důvodu.")
+            full_output = action.get("full_output_required", False)
 
             console.print(Panel(f"[bold yellow]{command}[/bold yellow]", title="🤖 [magenta]AI navrhuje příkaz[/magenta]", style="blue"))
             rprint(f"[blue]📌 Důvod:[/blue] {reason}")
+
+            if full_output:
+                rprint("[yellow]⚠️ Tento příkaz bude mít plný výstup. Může být dlouhý.[/yellow]")
 
             decision = questionary.select(
                 "Chceš tento příkaz provést?",
@@ -89,7 +92,7 @@ def main():
                 approved = True
                 edited = True
             elif decision.startswith("📝"):
-                extra_prompt = questionary.text("📝 Doplňující prompt:").ask()
+                extra_prompt = questionary.text("📝 Doplnit prompt:").ask()
                 save_session_interaction(session_id, "user", extra_prompt)
                 continue
             else:
@@ -100,8 +103,8 @@ def main():
 
             if approved:
                 result = run_shell_command(command)
-                truncated_result = get_head_of_output(result)
-                save_session_interaction(session_id, "shell_output", truncated_result)
+                output = result if full_output else get_head_output(result)
+                save_session_interaction(session_id, "shell_output", output)
                 save_audit_log(command, approved, edited, session_id, True, result)
 
         elif action["action"] == "ask_user":
