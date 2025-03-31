@@ -14,11 +14,18 @@ from memory import (
     KB_FILE
 )
 
+
 console = Console()
 
 config = yaml.safe_load(open("config.yaml"))
 language = config["language"]
 trust_level = config["trust_level"]
+
+MAX_OUTPUT_LINES = 10
+
+def get_head_of_output(text, lines=MAX_OUTPUT_LINES):
+    all_lines = text.strip().splitlines()
+    return "\n".join(all_lines[:lines]) + ("\n... [truncated]" if len(all_lines) > lines else "")
 
 def run_shell_command(command):
     rprint("[bold green]🚀 Spouštím příkaz...[/bold green]\n")
@@ -93,7 +100,8 @@ def main():
 
             if approved:
                 result = run_shell_command(command)
-                save_session_interaction(session_id, "shell_output", result)
+                truncated_result = get_head_of_output(result)
+                save_session_interaction(session_id, "shell_output", truncated_result)
                 save_audit_log(command, approved, edited, session_id, True, result)
 
         elif action["action"] == "ask_user":
