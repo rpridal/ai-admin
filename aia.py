@@ -2,17 +2,18 @@ import questionary
 from rich import print as rprint
 from rich.panel import Panel
 from rich.console import Console
-import sys, uuid, yaml, subprocess, time, os
+import sys, yaml, time, os
 from ai import query_ai
 from memory import (
     save_session_interaction,
     load_session_history,
     save_audit_log,
     ensure_dirs_and_files,
-    save_to_knowledge_base,
-    load_yaml,
-    KB_FILE
+    save_to_knowledge_base
 )
+from commands.run_shell import RunShellCommand
+from commands.ask_user import AskUserCommand
+from commands.done import DoneCommand
 
 console = Console()
 
@@ -20,20 +21,11 @@ config = yaml.safe_load(open("config.yaml"))
 language = config["language"]
 trust_level = config["trust_level"]
 
-MAX_OUTPUT_LINES = 10
-
-
-def run_shell_command(command):
-    rprint("[bold green]🚀 Spouštím příkaz...[/bold green]\n")
-    result = subprocess.getoutput(command)
-    console.print(Panel(result, title="✅ [green]Výstup příkazu[/green]", style="cyan"))
-    return result
-
-
-def get_head_output(text, lines=MAX_OUTPUT_LINES):
-    all_lines = text.strip().splitlines()
-    return "\n".join(all_lines[:lines]) + ("\n... [truncated]" if len(all_lines) > lines else "")
-
+handlers = {
+    "run_shell": RunShellCommand,
+    "ask_user": AskUserCommand,
+    "done": DoneCommand
+}
 
 def get_latest_session_id():
     session_dir = "data/sessions"
@@ -42,7 +34,6 @@ def get_latest_session_id():
         return None
     latest = max(files, key=lambda f: int(f.replace(".yaml", "")))
     return latest.replace(".yaml", "")
-
 
 def main():
     ensure_dirs_and_files()
@@ -58,6 +49,7 @@ def main():
             rprint("[red]❌ Nebyla nalezena žádná předchozí session.[/red]")
             sys.exit(1)
         rprint(f"[green]🔄 Pokračuji v session:[/green] {session_id}")
+        save_session_interaction(session_id, "user", "Pokračuj, kde jsme skončili. Co mám udělat dál?")
     else:
         session_id = str(int(time.time()))
         user_prompt = args[0]
@@ -80,65 +72,22 @@ def main():
             rprint(f"[red]❌ Chyba při parsování YAML:[/red] {e}")
             continue
 
+        if not isinstance(action, dict) or "action" not in action:
+            rprint("[red]❌ AI odpověď neobsahuje platnou akci.[/red]")
+            rprint(action)
+            continue
+
         if "remember" in action:
             save_to_knowledge_base(action["remember"])
             rprint(f"[cyan]🧠 Zapamatováno:[/cyan] {action['remember']}")
 
-        if action["action"] == "run_shell":
-            command = action["command"]
-            reason = action.get("reason", "Bez uvedení důvodu.")
-            full_output = action.get("full_output_required", False)
+        action_type = action["action"]
+        handler_class = handlers.get(action_type)
 
-            console.print(Panel(f"[bold yellow]{command}[/bold yellow]", title="🤖 [magenta]AI navrhuje příkaz[/magenta]", style="blue"))
-            rprint(f"[blue]📌 Důvod:[/blue] {reason}")
-
-            if full_output:
-                rprint("[yellow]⚠️ Tento příkaz bude mít plný výstup. Může být dlouhý.[/yellow]")
-
-            decision = questionary.select(
-                "Chceš tento příkaz provést?",
-                choices=[
-                    "✅ Ano, spustit příkaz",
-                    "✏️ Upravit příkaz",
-                    "📝 Doplnit prompt",
-                    "⛔️ Zrušit akci"
-                ]).ask()
-
-            if decision.startswith("✅"):
-                approved = True
-                edited = False
-            elif decision.startswith("✏️"):
-                command = questionary.text("✏️ Uprav příkaz:", default=command).ask()
-                approved = True
-                edited = True
-            elif decision.startswith("📝"):
-                extra_prompt = questionary.text("📝 Doplnit prompt:").ask()
-                save_session_interaction(session_id, "user", extra_prompt)
-                continue
-            else:
-                approved = False
-                edited = False
-                rprint("[red]⛔️ Zrušeno uživatelem.[/red]")
-                return
-
-            if approved:
-                result = run_shell_command(command)
-                output = result if full_output else get_head_output(result)
-                save_session_interaction(session_id, "shell_output", output)
-                save_audit_log(command, approved, edited, session_id, True, result)
-
-        elif action["action"] == "ask_user":
-            question = action["question"]
-            answer = questionary.text(f"❓ {question}").ask()
-            save_session_interaction(session_id, "user", answer)
-
-        elif action["action"] == "done":
-            message = action["message"]
-            rprint(f"\n✨ [green]AI:[/green] {message}")
-            break
-
+        if handler_class:
+            handler_class(action, session_id).execute()
         else:
-            rprint("[red]⚠️ Neznámá akce.[/red]")
+            rprint(f"[red]⚠️ Neznámá akce: {action_type}[/red]")
             break
 
 if __name__ == "__main__":
